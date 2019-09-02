@@ -8,6 +8,7 @@ TLS handshake extensions.
 
 from __future__ import print_function
 
+import os
 import struct
 
 from cryptography.hazmat.backends import default_backend
@@ -576,6 +577,7 @@ class TLS_Ext_Cookie(TLS_Ext_Unknown):
             self.cookie = os.urandom(32)
 
         return TLS_Ext_Unknown.build(self)
+
 
 _tls_psk_kx_modes = {0: "psk_ke", 1: "psk_dhe_ke"}
 

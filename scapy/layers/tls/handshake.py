@@ -514,7 +514,6 @@ class TLS13ServerHello(_TLSHandshake):
 
         return TLS13ServerHello
 
-
     def post_build(self, p, pay):
         if self.random_bytes is None:
             p = p[:6] + randstring(32) + p[6 + 32:]
