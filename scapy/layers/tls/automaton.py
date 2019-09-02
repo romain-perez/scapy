@@ -238,8 +238,6 @@ class _TLSAutomaton(Automaton):
         """
         Send all buffered records and update the session accordingly.
         """
-        for p in self.buffer_out:
-            p.show()
         s = b"".join(p.raw_stateful() for p in self.buffer_out)
         self.socket.send(s)
         self.buffer_out = []
