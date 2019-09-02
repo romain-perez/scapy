@@ -36,8 +36,19 @@ class _TLSAutomaton(Automaton):
       | <<<--------- |    S2 - ChangeCipherSpec
       | <<<--------- |    S2 - Finished [encrypted]
 
+
     We call these successive groups of messages:
     ClientFlight1, ServerFlight1, ClientFlight2 and ServerFlight2.
+
+    With TLS 1.3, the handshake require only 1-RTT:
+
+    Client        Server
+      | --------->>> |    C1 - ClientHello
+      | <<<--------- |    S1 - ServerHello
+      | <<<--------- |    S1 - Certificate [encrypted]
+      | <<<--------- |    S1 - CertificateVerify [encrypted]
+      | <<<--------- |    S1 - Finished [encrypted]
+      | --------->>> |    C2 - Finished [encrypted]
 
     We want to send our messages from the same flight all at once through the
     socket. This is achieved by managing a list of records in 'buffer_out'.
@@ -138,20 +149,27 @@ class _TLSAutomaton(Automaton):
             # Remote peer is not willing to respond
             return
 
-        p = TLS(self.remain_in, tls_session=self.cur_session)
-        self.cur_session = p.tls_session
-        self.remain_in = b""
-        if isinstance(p, SSLv2) and not p.msg:
-            p.msg = Raw("")
-        if self.cur_session.tls_version is None or \
-           self.cur_session.tls_version < 0x0304:
-            self.buffer_in += p.msg
+        if (byte0 == 0x17 and
+                (self.cur_session.advertised_tls_version >= 0x0304 or
+                 self.cur_session.tls_version >= 0x0304)):
+            p = TLS13(self.remain_in, tls_session=self.cur_session)
+            self.remain_in = b""
+            self.buffer_in += p.inner.msg
         else:
-            if isinstance(p, TLS13):
-                self.buffer_in += p.inner.msg
-            else:
-                # should be TLS13ServerHello only
+            p = TLS(self.remain_in, tls_session=self.cur_session)
+            self.cur_session = p.tls_session
+            self.remain_in = b""
+            if isinstance(p, SSLv2) and not p.msg:
+                p.msg = Raw("")
+            if self.cur_session.tls_version is None or \
+               self.cur_session.tls_version < 0x0304:
                 self.buffer_in += p.msg
+            else:
+                if isinstance(p, TLS13):
+                    self.buffer_in += p.inner.msg
+                else:
+                    # should be TLS13ServerHello only
+                    self.buffer_in += p.msg
 
         while p.payload:
             if isinstance(p.payload, Raw):
@@ -174,8 +192,11 @@ class _TLSAutomaton(Automaton):
         # Maybe we already parsed the expected packet, maybe not.
         if get_next_msg:
             self.get_next_msg()
+        from scapy.layers.tls.handshake import TLSClientHello
         if (not self.buffer_in or
-                not isinstance(self.buffer_in[0], pkt_cls)):
+                (not isinstance(self.buffer_in[0], pkt_cls) and
+                 not (isinstance(self.buffer_in[0], TLSClientHello) and
+                 self.cur_session.advertised_tls_version == 0x0304))):
             return
         self.cur_pkt = self.buffer_in[0]
         self.buffer_in = self.buffer_in[1:]
@@ -217,6 +238,8 @@ class _TLSAutomaton(Automaton):
         """
         Send all buffered records and update the session accordingly.
         """
+        for p in self.buffer_out:
+            p.show()
         s = b"".join(p.raw_stateful() for p in self.buffer_out)
         self.socket.send(s)
         self.buffer_out = []

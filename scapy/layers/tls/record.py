@@ -23,7 +23,8 @@ from scapy.packet import Raw, Padding, bind_layers
 from scapy.layers.inet import TCP
 from scapy.layers.tls.session import _GenericTLSSessionInheritance
 from scapy.layers.tls.handshake import (_tls_handshake_cls, _TLSHandshake,
-                                        _tls13_handshake_cls, TLS13ServerHello)
+                                        _tls13_handshake_cls, TLS13ServerHello,
+                                        TLS13ClientHello)
 from scapy.layers.tls.basefields import (_TLSVersionField, _tls_version,
                                          _TLSIVField, _TLSMACField,
                                          _TLSPadField, _TLSPadLenField,
@@ -180,6 +181,7 @@ class _TLSMsgListField(PacketListField):
                     pkt.type = 22
                 elif isinstance(p, TLSApplicationData):
                     pkt.type = 23
+
             p.tls_session = pkt.tls_session
             if not pkt.tls_session.frozen:
                 cur = p.raw_stateful()
@@ -199,12 +201,17 @@ class _TLSMsgListField(PacketListField):
         res = b""
         for p in val:
             res += self.i2m(pkt, p)
+
+        # Add TLS13ClientHello in case of HelloRetryRequest
         if (isinstance(pkt, _GenericTLSSessionInheritance) and
-            _tls_version_check(pkt.tls_session.tls_version, 0x0304) and
-                not isinstance(pkt, TLS13ServerHello)):
+                _tls_version_check(pkt.tls_session.tls_version, 0x0304) and
+                not isinstance(pkt.msg[0], TLS13ServerHello) and
+                not isinstance(pkt.msg[0], TLS13ClientHello)):
             return s + res
+
         if not pkt.type:
             pkt.type = 0
+
         hdr = struct.pack("!B", pkt.type) + s[1:5]
         return hdr + res
 
@@ -295,8 +302,11 @@ class TLS(_GenericTLSSessionInheritance):
                 return SSLv2
             else:
                 s = kargs.get("tls_session", None)
+                print("byte0 : %x" % byte0)
+                print("byte1 : %x" % byte1)
                 if s and _tls_version_check(s.tls_version, 0x0304):
-                    if s.rcs and not isinstance(s.rcs.cipher, Cipher_NULL):
+                    if (s.rcs and not isinstance(s.rcs.cipher, Cipher_NULL) and
+                            byte0 == 0x16):
                         from scapy.layers.tls.record_tls13 import TLS13
                         return TLS13
         if _pkt and len(_pkt) < 5:
@@ -679,7 +689,6 @@ class TLS(_GenericTLSSessionInheritance):
                 self.tls_session.wcs = self.tls_session.pwcs
                 self.tls_session.pwcs = None
             self.tls_session.triggered_pwcs_commit = False
-
         return hdr + efrag + pay
 
 

@@ -192,7 +192,7 @@ class TLS13(_GenericTLSSessionInheritance):
         add_data = (pkcs_i2osp(self.type, 1) +
                     pkcs_i2osp(self.version, 2) +
                     pkcs_i2osp(len(s) + wcs.cipher.tag_len, 2))
-
+        print("wcs.cipher : %s" % wcs.cipher)
         return wcs.cipher.auth_encrypt(s, add_data, write_seq_num)
 
     def post_build(self, pkt, pay):
