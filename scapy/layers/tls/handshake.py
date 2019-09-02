@@ -1064,6 +1064,7 @@ class TLS13CertificateRequest(_TLSHandshake):
                    _ExtensionsField("ext", None,
                                     length_from=lambda pkt: pkt.msglen -
                                     pkt.cert_req_ctxt_len - 3)]
+
 ###############################################################################
 #   ServerHelloDone                                                           #
 ###############################################################################
@@ -1107,6 +1108,8 @@ class TLSCertificateVerify(_TLSHandshake):
 
     def post_dissection(self, pkt):
         s = self.tls_session
+        if s.tls_version is None:
+            return
         m = b"".join(s.handshake_messages)
         if s.tls_version >= 0x0304:
             if s.connection_end == "client":
