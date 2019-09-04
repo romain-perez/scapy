@@ -1101,7 +1101,6 @@ class TLSClientAutomaton(_TLSAutomaton):
 
     @ATMT.state()
     def TLS13_PREPARE_CLIENTFLIGHT2(self):
-        print("TLS13_PREPARE_CLIENTFLIGHT2")
         if self.cur_session.middlebox_compatibility:
             self.add_record(is_tls12=True)
             self.add_msg(TLSChangeCipherSpec())
