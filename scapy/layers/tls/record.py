@@ -181,7 +181,6 @@ class _TLSMsgListField(PacketListField):
                     pkt.type = 22
                 elif isinstance(p, TLSApplicationData):
                     pkt.type = 23
-
             p.tls_session = pkt.tls_session
             if not pkt.tls_session.frozen:
                 cur = p.raw_stateful()
@@ -201,12 +200,13 @@ class _TLSMsgListField(PacketListField):
         res = b""
         for p in val:
             res += self.i2m(pkt, p)
-
         # Add TLS13ClientHello in case of HelloRetryRequest
+        # Add ChangeCipherSpec for middlebox compatibility
         if (isinstance(pkt, _GenericTLSSessionInheritance) and
                 _tls_version_check(pkt.tls_session.tls_version, 0x0304) and
                 not isinstance(pkt.msg[0], TLS13ServerHello) and
-                not isinstance(pkt.msg[0], TLS13ClientHello)):
+                not isinstance(pkt.msg[0], TLS13ClientHello) and
+                not isinstance(pkt.msg[0], TLSChangeCipherSpec)):
             return s + res
 
         if not pkt.type:
@@ -303,7 +303,8 @@ class TLS(_GenericTLSSessionInheritance):
             else:
                 s = kargs.get("tls_session", None)
                 if s and _tls_version_check(s.tls_version, 0x0304):
-                    if s.rcs and not isinstance(s.rcs.cipher, Cipher_NULL):
+                    if (s.rcs and not isinstance(s.rcs.cipher, Cipher_NULL) and
+                            byte0 == 0x17):
                         from scapy.layers.tls.record_tls13 import TLS13
                         return TLS13
         if _pkt and len(_pkt) < 5:
