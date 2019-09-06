@@ -72,7 +72,12 @@ class KeyShareEntry(Packet):
                     privkey = x25519.X25519PrivateKey.generate()
                     self.privkey = privkey
                     pubkey = privkey.public_key()
-                    self.key_exchange = pubkey.public_bytes()
+                    # public_bytes requires encoding and format
+                    # format arguments since version 2.0
+                    self.key_exchange = pubkey.public_bytes(
+                        encoding=serialization.Encoding.Raw,
+                        format=serialization.PublicFormat.Raw
+                    )
             elif _tls_named_curves[self.group] != "x448":
                 curve = ec._CURVE_TYPES[_tls_named_curves[self.group]]()
                 privkey = ec.generate_private_key(curve, default_backend())
