@@ -32,13 +32,15 @@ from scapy.layers.tls.basefields import _tls_version, _tls_version_options
 from scapy.layers.tls.session import tlsSession
 from scapy.layers.tls.extensions import TLS_Ext_SupportedGroups, \
     TLS_Ext_SupportedVersion_CH, TLS_Ext_SignatureAlgorithms, \
-    TLS_Ext_SupportedVersion_SH, TLS_Ext_PSKKeyExchangeModes
+    TLS_Ext_SupportedVersion_SH, TLS_Ext_PSKKeyExchangeModes, \
+    TLS_Ext_EarlyDataIndication
 from scapy.layers.tls.handshake import TLSCertificate, TLSCertificateRequest, \
     TLSCertificateVerify, TLSClientHello, TLSClientKeyExchange, \
     TLSEncryptedExtensions, TLSFinished, TLSServerHello, TLSServerHelloDone, \
     TLSServerKeyExchange, TLS13Certificate, TLS13ClientHello,  \
     TLS13ServerHello, TLS13HelloRetryRequest, TLS13CertificateRequest, \
-    _ASN1CertAndExt, TLS13KeyUpdate, TLS13NewSessionTicket
+    _ASN1CertAndExt, TLS13KeyUpdate, TLS13NewSessionTicket, \
+    TLS13EndOfEarlyData                 
 from scapy.layers.tls.handshake_sslv2 import SSLv2ClientHello, \
     SSLv2ServerHello, SSLv2ClientMasterKey, SSLv2ServerVerify, \
     SSLv2ClientFinished, SSLv2ServerFinished, SSLv2ClientCertificate, \
@@ -86,6 +88,7 @@ class TLSClientAutomaton(_TLSAutomaton):
                    data=None,
                    ciphersuite=None,
                    curve=None,
+                   early_data_file=None,
                    **kargs):
 
         super(TLSClientAutomaton, self).parse_args(mycert=mycert,
@@ -150,6 +153,12 @@ class TLSClientAutomaton(_TLSAutomaton):
                 for (group_id, ng) in _tls_named_groups.items():
                     if ng == curve:
                         self.curve = group_id
+
+            if early_data_file:
+                with open(early_data_file, "r") as f:
+                    self.early_data = f.read()
+            else:
+                self.early_data = None
 
     def vprint_sessioninfo(self):
         if self.verbose:
@@ -618,7 +627,7 @@ class TLSClientAutomaton(_TLSAutomaton):
                 with open(self.session_ticket_file_out, 'wb') as f:
                     f.write(struct.pack("B", 2))
                     # we choose wcs arbitrary...
-                    f.write(struct.pack("!H",
+                    f.write(struct.pack("!H", 
                                         self.cur_session.wcs.ciphersuite.val))
                     f.write(struct.pack("B", p.noncelen))
                     f.write(p.ticket_nonce)
@@ -968,6 +977,10 @@ class TLSClientAutomaton(_TLSAutomaton):
         s = self.cur_session
 
         if s.tls13_psk_secret:
+            
+            if self.early_data:
+                ext += TLS_Ext_EarlyDataIndication()
+
             # Check if DHE is need (both for out of band and resumption PSK)
             if self.tls13_psk_mode == "psk_dhe_ke":
                 ext += TLS_Ext_PSKKeyExchangeModes(kxmodes="psk_dhe_ke")
@@ -1024,6 +1037,9 @@ class TLSClientAutomaton(_TLSAutomaton):
 
     @ATMT.state()
     def TLS13_ADDED_CLIENTHELLO(self):
+        if self.early_data:
+            self.add_record(is_tls13=True)
+            self.add_msg(TLSApplicationData(data=self.early_data))        
         raise self.TLS13_SENDING_CLIENTFLIGHT1()
 
     @ATMT.state()
@@ -1252,6 +1268,10 @@ class TLSClientAutomaton(_TLSAutomaton):
             self.add_record(is_tls12=True)
             self.add_msg(TLSChangeCipherSpec())
         self.add_record(is_tls13=True)
+        if self.early_data:
+            self.add_msg(TLS13EndOfEarlyData())
+            self.add_record(is_tls13=True)
+
 
     @ATMT.condition(TLS13_PREPARE_CLIENTFLIGHT2, prio=1)
     def tls13_should_add_ClientCertificate(self):

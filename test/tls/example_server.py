@@ -33,6 +33,8 @@ parser.add_argument("--client_auth", action="store_true",
                     help="Require client authentication")
 parser.add_argument("--ticket_file", dest='session_ticket_file',
                     help="File to write/read a ticket to (for TLS 1.3)")
+parser.add_argument("--early_data", action="store_true",
+                    help="Attempt to read 0-RTT data")
 args = parser.parse_args()
 
 pcs = None
@@ -49,6 +51,7 @@ t = TLSServerAutomaton(mycert=basedir+'/test/tls/pki/srv_cert.pem',
                        cookie=args.cookie,
                        session_ticket_file=args.session_ticket_file,
                        psk=args.psk,
-                       psk_mode=psk_mode)
+                       psk_mode=psk_mode,
+                       early_data=args.early_data)
 t.run()
 

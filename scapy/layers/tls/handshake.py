@@ -303,9 +303,11 @@ class TLSClientHello(_TLSHandshake):
         # No distinction between a TLS 1.2 ClientHello and a TLS
         # 1.3 ClientHello when dissecting : TLS 1.3 CH will be
         # parsed as TLSClientHello
+        is_tls13 = False
         if self.ext:
             for e in self.ext:
                 if isinstance(e, TLS_Ext_SupportedVersion_CH):
+                    is_tls13 = True
                     s.advertised_tls_version = e.versions[0]
                     if s.sid:
                         s.middlebox_compatibility = True
@@ -313,6 +315,36 @@ class TLSClientHello(_TLSHandshake):
                 if isinstance(e, TLS_Ext_SignatureAlgorithms):
                     s.advertised_sig_algs = e.sig_algs
 
+
+                if isinstance(e, TLS_Ext_EarlyDataIndication):
+                    # XXX external case
+                    connection_end = s.connection_end
+                    # The ciphersuite for the 0-RTT data is the one associated
+                    # with the PSK 
+                    if not s.tls13_ticket_ciphersuite:
+                        warning("Cipher suite associated with the ticket is not set !")
+                        return
+
+                    if s.tls13_ticket_ciphersuite not in _tls_cipher_suites_cls:
+                        warning("Unknown cipher suite %d" % cs_val)  # noqa: E501
+                        # we do not try to set a default nor stop the execution
+                    else:
+                        cs_cls = _tls_cipher_suites_cls[s.tls13_ticket_ciphersuite]
+
+                    if connection_end == "server":
+                        s.prcs = readConnState(ciphersuite=cs_cls,
+                                               connection_end=connection_end,
+                                               tls_version=0x0304)
+                        s.triggered_prcs_commit = True
+                    elif connection_end == "client":
+                        s.pwcs = writeConnState(ciphersuite=cs_cls,
+                                                connection_end=connection_end,
+                                                tls_version=0x0304)
+                        s.triggered_pwcs_commit = True
+
+                    s.compute_tls13_early_secrets()
+        if not is_tls13:
+            self.tls_session.advertised_tls_version = self.version
 
 class TLS13ClientHello(_TLSHandshake):
     """
@@ -435,6 +467,35 @@ class TLS13ClientHello(_TLSHandshake):
                     self.tls_session.advertised_tls_version = e.versions[0]
                 if isinstance(e, TLS_Ext_SignatureAlgorithms):
                     s.advertised_sig_algs = e.sig_algs
+                # If the early_data extension is present, we need to compute
+                # the key material for the 0-RTT data
+                if isinstance(e, TLS_Ext_EarlyDataIndication):
+                    # We need all the ClientHello to compute
+                    # client_early_traffic, so we couldn't compute it in the
+                    # post_build method.
+                    s.compute_tls13_early_secrets()
+
+                    if not s.tls13_ticket_ciphersuite:
+                        warning("Cipher suite associated with the ticket is not set !")
+                        return
+
+                    # The ciphersuite for the 0-RTT data is the one associated
+                    # with the PSK 
+                    if s.tls13_ticket_ciphersuite not in _tls_cipher_suites_cls:
+                        warning("Unknown cipher suite %d" % cs_val)  # noqa: E501
+                        # we do not try to set a default nor stop the execution
+                    else:
+                        cs_cls = _tls_cipher_suites_cls[s.tls13_ticket_ciphersuite]
+
+                    connection_end = s.connection_end
+
+                    s.pwcs = writeConnState(ciphersuite=cs_cls,
+                                            connection_end=connection_end,
+                                            tls_version=0x0304)
+
+                    s.triggered_pwcs_commit = True
+                    cets = s.tls13_derived_secrets["client_early_traffic_secret"]  # noqa: E501
+                    s.pwcs.tls13_derive_keys(cets)
 
 
 ###############################################################################
@@ -1586,6 +1647,32 @@ class TLS13EndOfEarlyData(_TLSHandshake):
     fields_desc = [ByteEnumField("msgtype", 5, _tls_handshake_type),
                    ThreeBytesField("msglen", None)]
 
+    def post_build_tls_session_update(self, msg_str):
+        self.tls_session_update(msg_str)
+        s = self.tls_session
+        connection_end = s.connection_end
+        if connection_end == "client":
+
+            s.pwcs = writeConnState(ciphersuite=type(s.rcs.ciphersuite),
+                                    connection_end=connection_end,
+                                    tls_version=s.tls_version)
+
+            s.triggered_pwcs_commit = True
+            chts = s.tls13_derived_secrets["client_handshake_traffic_secret"]
+            s.pwcs.tls13_derive_keys(chts)
+
+    def post_dissection_tls_session_update(self, msg_str):
+        self.tls_session_update(msg_str)
+        s = self.tls_session
+        connection_end = s.connection_end
+        if connection_end == "server":
+            s.prcs = writeConnState(ciphersuite=type(s.rcs.ciphersuite),
+                                    connection_end=connection_end,
+                                    tls_version=s.tls_version)
+
+            s.triggered_prcs_commit = True
+            chts = s.tls13_derived_secrets["client_handshake_traffic_secret"]
+            s.prcs.tls13_derive_keys(chts)
 
 ###############################################################################
 #   KeyUpdate                                                                 #

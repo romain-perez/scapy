@@ -698,7 +698,9 @@ class _ExtensionsLenField(FieldLenField):
         if tmp_len is None or tmp_len <= 0:
             v = pkt.tls_session.tls_version
             if v is None or v < 0x0304:
+                print("1111")
                 return s, None
+        print("2222")
         return super(_ExtensionsLenField, self).getfield(pkt, s)
 
     def addfield(self, pkt, s, i):
