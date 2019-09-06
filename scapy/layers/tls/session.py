@@ -622,6 +622,27 @@ class tlsSession(object):
             if self.pwcs:
                 self.pwcs.tls13_derive_keys(cets)
 
+    def compute_tls13_other_early_secrets(self):
+        """
+        
+        """
+        if self.prcs and self.prcs.hkdf:
+            hkdf = self.prcs.hkdf
+        elif self.pwcs and self.pwcs.hkdf:
+            hkdf = self.pwcs.hkdf
+        else:
+            hkdf = TLS13_HKDF("sha256")
+
+        cets = hkdf.derive_secret(self.tls13_early_secret,
+                                  b"c e traffic",
+                                  b"".join(self.handshake_messages))
+
+        self.tls13_derived_secrets["client_early_traffic_secret"] = cets
+        ees = hkdf.derive_secret(self.tls13_early_secret,
+                                 b"e exp master",
+                                 b"".join(self.handshake_messages))
+        self.tls13_derived_secrets["early_exporter_secret"] = ees
+
     def compute_tls13_handshake_secrets(self):
         """
         Ciphers key and IV are updated accordingly for Handshake data.

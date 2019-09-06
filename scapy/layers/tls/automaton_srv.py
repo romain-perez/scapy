@@ -33,12 +33,12 @@ from scapy.error import warning
 from scapy.layers.tls.automaton import _TLSAutomaton
 from scapy.layers.tls.cert import PrivKeyRSA, PrivKeyECDSA
 from scapy.layers.tls.basefields import _tls_version
-from scapy.layers.tls.session import tlsSession
+from scapy.layers.tls.session import tlsSession, readConnState
 from scapy.layers.tls.crypto.groups import _tls_named_groups
 from scapy.layers.tls.extensions import TLS_Ext_SupportedVersion_SH, \
     TLS_Ext_SupportedGroups, TLS_Ext_Cookie, \
     TLS_Ext_SignatureAlgorithms, TLS_Ext_PSKKeyExchangeModes, \
-    TLS_Ext_EarlyDataIndicationTicket
+    TLS_Ext_EarlyDataIndicationTicket, TLS_Ext_EarlyDataIndication
 from scapy.layers.tls.keyexchange_tls13 import TLS_Ext_KeyShare_SH, \
     KeyShareEntry, TLS_Ext_KeyShare_HRR, TLS_Ext_PreSharedKey_CH, \
     TLS_Ext_PreSharedKey_SH
@@ -47,7 +47,7 @@ from scapy.layers.tls.handshake import TLSCertificate, TLSCertificateRequest, \
     TLSServerHello, TLSServerHelloDone, TLSServerKeyExchange, \
     _ASN1CertAndExt, TLS13ServerHello, TLS13Certificate, TLS13ClientHello, \
     TLSEncryptedExtensions, TLS13HelloRetryRequest, TLS13CertificateRequest, \
-    TLS13KeyUpdate, TLS13NewSessionTicket
+    TLS13KeyUpdate, TLS13NewSessionTicket, TLS13EndOfEarlyData
 from scapy.layers.tls.handshake_sslv2 import SSLv2ClientCertificate, \
     SSLv2ClientFinished, SSLv2ClientHello, SSLv2ClientMasterKey, \
     SSLv2RequestCertificate, SSLv2ServerFinished, SSLv2ServerHello, \
@@ -600,7 +600,6 @@ class TLSServerAutomaton(_TLSAutomaton):
                     s.triggered_prcs_commit = True
                     cets = s.tls13_derived_secrets["client_early_traffic_secret"]  # noqa: E501
                     s.prcs.tls13_derive_keys(cets)
-
             self.get_next_msg(0.0, 1)
             if not self.buffer_in:
                 raise self.tls13_PREPARE_SERVERFLIGHT1()
@@ -647,7 +646,6 @@ class TLSServerAutomaton(_TLSAutomaton):
     def tls13_HANDLE_EARLY_DATA(self):
         p = self.buffer_in[0]
         self.buffer_in = self.buffer_in[1:]
-
         #    We check that the server can handle early_data and
         #    that the size of the data received is within the limit
         #    authorized by the server
@@ -934,6 +932,15 @@ class TLSServerAutomaton(_TLSAutomaton):
         self.raise_on_packet(TLSChangeCipherSpec,
                              self.tls13_RECEIVED_CLIENTFLIGHT2)
 
+    @ATMT.state()
+    def TLS13_HANDLED_ENDOFEARLYDATA(self):
+        pass
+
+    @ATMT.condition(TLS13_HANDLED_ENDOFEARLYDATA)
+    def tls13_should_handle_ClientFinishedFromEndOfEarlyData(self):
+        self.raise_on_packet(TLSFinished,
+                             self.TLS13_HANDLED_CLIENTFINISHED)
+
     # RFC8446, section 4.4.2.4 :
     # "If the client does not send any certificates (i.e., it sends an empty
     # Certificate message), the server MAY at its discretion either
@@ -1022,8 +1029,8 @@ class TLSServerAutomaton(_TLSAutomaton):
             line += b";"
             line += binascii.hexlify(struct.pack("!H", s.wcs.ciphersuite.val))
             line += b";"
-            if (ticket.ext is None or ticket.extlen is None or
-                    ticket.extlen == 0):
+
+            if ticket.ext is None or ticket.extlen == 0:
                 line += binascii.hexlify(struct.pack("!I", 0))
             else:
                 for e in ticket.ext:
