@@ -315,21 +315,20 @@ class TLSClientHello(_TLSHandshake):
                 if isinstance(e, TLS_Ext_SignatureAlgorithms):
                     s.advertised_sig_algs = e.sig_algs
 
-
                 if isinstance(e, TLS_Ext_EarlyDataIndication):
                     # XXX external case
                     connection_end = s.connection_end
                     # The ciphersuite for the 0-RTT data is the one associated
-                    # with the PSK 
+                    # with the PSK
                     if not s.tls13_ticket_ciphersuite:
-                        warning("Cipher suite associated with the ticket is not set !")
+                        warning("Cipher suite associated with the ticket is not set !")  # noqa: E501
                         return
 
-                    if s.tls13_ticket_ciphersuite not in _tls_cipher_suites_cls:
-                        warning("Unknown cipher suite %d" % cs_val)  # noqa: E501
+                    if s.tls13_ticket_ciphersuite not in _tls_cipher_suites_cls:  # noqa: E501
+                        warning("Unknown cipher suite %d" % s.tls13_ticket_ciphersuite)  # noqa: E501
                         # we do not try to set a default nor stop the execution
                     else:
-                        cs_cls = _tls_cipher_suites_cls[s.tls13_ticket_ciphersuite]
+                        cs_cls = _tls_cipher_suites_cls[s.tls13_ticket_ciphersuite]  # noqa: E501
 
                     if connection_end == "server":
                         s.prcs = readConnState(ciphersuite=cs_cls,
@@ -345,6 +344,7 @@ class TLSClientHello(_TLSHandshake):
                     s.compute_tls13_early_secrets()
         if not is_tls13:
             self.tls_session.advertised_tls_version = self.version
+
 
 class TLS13ClientHello(_TLSHandshake):
     """
@@ -476,16 +476,16 @@ class TLS13ClientHello(_TLSHandshake):
                     s.compute_tls13_early_secrets()
 
                     if not s.tls13_ticket_ciphersuite:
-                        warning("Cipher suite associated with the ticket is not set !")
+                        warning("Cipher suite associated with the ticket is not set !")  # noqa: E501
                         return
 
                     # The ciphersuite for the 0-RTT data is the one associated
-                    # with the PSK 
-                    if s.tls13_ticket_ciphersuite not in _tls_cipher_suites_cls:
-                        warning("Unknown cipher suite %d" % cs_val)  # noqa: E501
+                    # with the PSK
+                    if s.tls13_ticket_ciphersuite not in _tls_cipher_suites_cls:  # noqa: E501
+                        warning("Unknown cipher suite %d" % s.tls13_ticket_ciphersuite)  # noqa: E501
                         # we do not try to set a default nor stop the execution
                     else:
-                        cs_cls = _tls_cipher_suites_cls[s.tls13_ticket_ciphersuite]
+                        cs_cls = _tls_cipher_suites_cls[s.tls13_ticket_ciphersuite]  # noqa: E501
 
                     connection_end = s.connection_end
 
@@ -1677,6 +1677,8 @@ class TLS13EndOfEarlyData(_TLSHandshake):
 ###############################################################################
 #   KeyUpdate                                                                 #
 ###############################################################################
+
+
 _key_update_request = {0: "update_not_requested", 1: "update_requested"}
 
 

@@ -126,7 +126,7 @@ class TLSServerAutomaton(_TLSAutomaton):
         self.psk_secret = psk
         self.psk_mode = psk_mode
         self.session_ticket_file = session_ticket_file
-        # early_data is a flag to indicate wether or not the server
+        # early_data is a flag to indicate if the server
         # will try to read early_data after the missing_ClientHello
         self.early_data = early_data
         self.early_data_was_accepted = False
@@ -564,7 +564,7 @@ class TLSServerAutomaton(_TLSAutomaton):
         #  Here, we received a message after ClientHello
         #  We check if it's early_data
         if self.early_data:
-            #    Before reading the next message wich should be early data
+            #    Before reading the next message which should be early data
             #    encrypted, we create an readConnState instance in order
             #    to decrypt the early_data.
             #
@@ -589,14 +589,13 @@ class TLSServerAutomaton(_TLSAutomaton):
                 if resumption_psk is not None:
                     s.tls13_psk_secret = resumption_psk
                     s.compute_tls13_early_secrets()
-                    s.compute_tls13_other_early_secrets()
 
                     cs_cls = _tls_cipher_suites_cls[self.resumed_ciphersuite]
                     connection_end = s.connection_end
 
                     s.prcs = readConnState(ciphersuite=cs_cls,
-                                            connection_end=connection_end,
-                                            tls_version=0x0304)
+                                           connection_end=connection_end,
+                                           tls_version=0x0304)
                     s.triggered_prcs_commit = True
                     cets = s.tls13_derived_secrets["client_early_traffic_secret"]  # noqa: E501
                     s.prcs.tls13_derive_keys(cets)

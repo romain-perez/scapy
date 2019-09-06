@@ -40,7 +40,7 @@ from scapy.layers.tls.handshake import TLSCertificate, TLSCertificateRequest, \
     TLSServerKeyExchange, TLS13Certificate, TLS13ClientHello,  \
     TLS13ServerHello, TLS13HelloRetryRequest, TLS13CertificateRequest, \
     _ASN1CertAndExt, TLS13KeyUpdate, TLS13NewSessionTicket, \
-    TLS13EndOfEarlyData                 
+    TLS13EndOfEarlyData
 from scapy.layers.tls.handshake_sslv2 import SSLv2ClientHello, \
     SSLv2ServerHello, SSLv2ClientMasterKey, SSLv2ServerVerify, \
     SSLv2ClientFinished, SSLv2ServerFinished, SSLv2ClientCertificate, \
@@ -627,7 +627,7 @@ class TLSClientAutomaton(_TLSAutomaton):
                 with open(self.session_ticket_file_out, 'wb') as f:
                     f.write(struct.pack("B", 2))
                     # we choose wcs arbitrary...
-                    f.write(struct.pack("!H", 
+                    f.write(struct.pack("!H",
                                         self.cur_session.wcs.ciphersuite.val))
                     f.write(struct.pack("B", p.noncelen))
                     f.write(p.ticket_nonce)
@@ -977,7 +977,6 @@ class TLSClientAutomaton(_TLSAutomaton):
         s = self.cur_session
 
         if s.tls13_psk_secret:
-            
             if self.early_data:
                 ext += TLS_Ext_EarlyDataIndication()
 
@@ -1039,7 +1038,7 @@ class TLSClientAutomaton(_TLSAutomaton):
     def TLS13_ADDED_CLIENTHELLO(self):
         if self.early_data:
             self.add_record(is_tls13=True)
-            self.add_msg(TLSApplicationData(data=self.early_data))        
+            self.add_msg(TLSApplicationData(data=self.early_data))
         raise self.TLS13_SENDING_CLIENTFLIGHT1()
 
     @ATMT.state()
@@ -1271,7 +1270,6 @@ class TLSClientAutomaton(_TLSAutomaton):
         if self.early_data:
             self.add_msg(TLS13EndOfEarlyData())
             self.add_record(is_tls13=True)
-
 
     @ATMT.condition(TLS13_PREPARE_CLIENTFLIGHT2, prio=1)
     def tls13_should_add_ClientCertificate(self):
