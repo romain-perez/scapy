@@ -139,7 +139,6 @@ class TLSClientAutomaton(_TLSAutomaton):
             cs = int(ciphersuite, 16)
             if cs in _tls_cipher_suites.keys():
                 self.ciphersuite = cs
-        self.curve = None
 
         if self.advertised_tls_version == 0x0304:
             self.resumption_master_secret = resumption_master_secret
@@ -960,7 +959,7 @@ class TLSClientAutomaton(_TLSAutomaton):
     @ATMT.condition(TLS13_START)
     def tls13_should_add_ClientHello(self):
         # we have to use the legacy, plaintext TLS record here
-        supported_groups = ["secp256r1", "secp384r1", "x25519"]
+        supported_groups = ["secp256r1", "secp384r1", "x25519", "x448"]
         self.add_record(is_tls13=False)
         if self.client_hello:
             p = self.client_hello

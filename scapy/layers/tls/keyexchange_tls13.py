@@ -26,6 +26,7 @@ if conf.crypto_valid:
     from cryptography.hazmat.primitives.asymmetric import dh, ec
 if conf.crypto_valid_advanced:
     from cryptography.hazmat.primitives.asymmetric import x25519
+    from cryptography.hazmat.primitives.asymmetric import x448
 
 
 class KeyShareEntry(Packet):
@@ -67,9 +68,12 @@ class KeyShareEntry(Packet):
             pubkey = privkey.public_key()
             self.key_exchange = pubkey.public_numbers().y
         elif self.group in _tls_named_curves:
-            if _tls_named_curves[self.group] == "x25519":
+            if _tls_named_curves[self.group] in ["x25519", "x448"]:
                 if conf.crypto_valid_advanced:
-                    privkey = x25519.X25519PrivateKey.generate()
+                    if _tls_named_curves[self.group] == "x25519":
+                        privkey = x25519.X25519PrivateKey.generate()
+                    else:
+                        privkey = x448.X448PrivateKey.generate()
                     self.privkey = privkey
                     pubkey = privkey.public_key()
                     # public_bytes requires encoding and format
@@ -78,7 +82,7 @@ class KeyShareEntry(Packet):
                         encoding=serialization.Encoding.Raw,
                         format=serialization.PublicFormat.Raw
                     )
-            elif _tls_named_curves[self.group] != "x448":
+            else:
                 curve = ec._CURVE_TYPES[_tls_named_curves[self.group]]()
                 privkey = ec.generate_private_key(curve, default_backend())
                 self.privkey = privkey
@@ -118,11 +122,14 @@ class KeyShareEntry(Packet):
             public_numbers = dh.DHPublicNumbers(self.key_exchange, pn)
             self.pubkey = public_numbers.public_key(default_backend())
         elif self.group in _tls_named_curves:
-            if _tls_named_curves[self.group] == "x25519":
+            if _tls_named_curves[self.group] in ["x25519", "x448"]:
                 if conf.crypto_valid_advanced:
-                    import_point = x25519.X25519PublicKey.from_public_bytes
+                    if _tls_named_curves[self.group] == "x25519":
+                        import_point = x25519.X25519PublicKey.from_public_bytes
+                    else:
+                        import_point = x448.X448PublicKey.from_public_bytes
                     self.pubkey = import_point(self.key_exchange)
-            elif _tls_named_curves[self.group] != "x448":
+            else:
                 curve = ec._CURVE_TYPES[_tls_named_curves[self.group]]()
                 import_point = ec.EllipticCurvePublicKey.from_encoded_point
                 public_numbers = import_point(curve, self.key_exchange).public_numbers()  # noqa: E501
@@ -201,7 +208,7 @@ class TLS_Ext_KeyShare_SH(TLS_Ext_Unknown):
                 if group_name in six.itervalues(_tls_named_ffdh_groups):
                     pms = privkey.exchange(pubkey)
                 elif group_name in six.itervalues(_tls_named_curves):
-                    if group_name == "x25519":
+                    if group_name in ["x25519", "x448"]:
                         pms = privkey.exchange(pubkey)
                     else:
                         pms = privkey.exchange(ec.ECDH(), pubkey)
@@ -224,7 +231,7 @@ class TLS_Ext_KeyShare_SH(TLS_Ext_Unknown):
                 if group_name in six.itervalues(_tls_named_ffdh_groups):
                     pms = privkey.exchange(pubkey)
                 elif group_name in six.itervalues(_tls_named_curves):
-                    if group_name == "x25519":
+                    if group_name in ["x25519", "x448"]:
                         pms = privkey.exchange(pubkey)
                     else:
                         pms = privkey.exchange(ec.ECDH(), pubkey)
@@ -235,7 +242,7 @@ class TLS_Ext_KeyShare_SH(TLS_Ext_Unknown):
                 if group_name in six.itervalues(_tls_named_ffdh_groups):
                     pms = privkey.exchange(pubkey)
                 elif group_name in six.itervalues(_tls_named_curves):
-                    if group_name == "x25519":
+                    if group_name in ["x25519", "x448"]:
                         pms = privkey.exchange(pubkey)
                     else:
                         pms = privkey.exchange(ec.ECDH(), pubkey)

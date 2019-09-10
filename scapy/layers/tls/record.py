@@ -110,6 +110,8 @@ class _TLSMsgListField(PacketListField):
             try:
                 return cls(m, tls_session=pkt.tls_session)
             except Exception:
+                import traceback
+                traceback.print_exc()
                 if conf.debug_dissector:
                     raise
                 return Raw(m)

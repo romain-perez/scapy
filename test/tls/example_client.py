@@ -35,6 +35,7 @@ parser.add_argument("--ticket_out", dest='session_ticket_file_out',
 parser.add_argument("--res_master",
                     help="Resumption master secret (for TLS 1.3)")
 parser.add_argument("--early_data", help="File to read early_data to send")
+parser.add_argument("--curve", help="ECC group to advertise")
 
 
 args = parser.parse_args()
@@ -69,7 +70,8 @@ t = TLSClientAutomaton(client_hello=ch,
                        resumption_master_secret=args.res_master,
                        session_ticket_file_in=args.session_ticket_file_in,
                        session_ticket_file_out=args.session_ticket_file_out,
-                       early_data_file=args.early_data,                       
+                       early_data_file=args.early_data,
+                       curve=args.curve
                       )
 t.run()
 
